@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import Alert from '../models/Alert.js';
+import { protect } from '../middleware/auth.js';
+const router = Router(); router.use(protect);
+router.get('/', async (req, res, next) => { try { const filter = req.query.unresolved === 'true' ? { acknowledged: false } : {}; res.json({ alerts: await Alert.find(filter).populate('reading').sort({ createdAt: -1 }).limit(200) }); } catch (e) { next(e); } });
+router.get('/recent', async (req, res, next) => { try { res.json({ alerts: await Alert.find().sort({ createdAt: -1 }).limit(8) }); } catch (e) { next(e); } });
+router.get('/unresolved', async (req, res, next) => { try { res.json({ alerts: await Alert.find({ acknowledged: false }).sort({ createdAt: -1 }) }); } catch (e) { next(e); } });
+router.get('/:id', async (req, res, next) => { try { const alert = await Alert.findById(req.params.id); if (!alert) return res.status(404).json({ message: 'Alert not found.' }); res.json({ alert }); } catch (e) { next(e); } });
+router.patch('/:id/acknowledge', async (req, res, next) => { try { const alert = await Alert.findByIdAndUpdate(req.params.id, { acknowledged: true, acknowledgedAt: new Date() }, { new: true }); if (!alert) return res.status(404).json({ message: 'Alert not found.' }); res.json({ alert }); } catch (e) { next(e); } });
+export default router;

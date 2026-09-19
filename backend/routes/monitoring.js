@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import MonitoringReading from '../models/MonitoringReading.js';
+import Alert from '../models/Alert.js';
+import { protect } from '../middleware/auth.js';
+import { evaluateReading, statusForAlerts } from '../services/thresholdService.js';
+const router = Router();
+router.use(protect);
+router.post('/', async (req, res, next) => { try { const reading = await MonitoringReading.create(req.body); const alerts = await evaluateReading(reading); reading.overallStatus = statusForAlerts(alerts); await reading.save(); res.status(201).json({ reading, alerts }); } catch (e) { next(e); } });
+router.get('/', async (req, res, next) => { try { const limit = Math.min(Number(req.query.limit) || 100, 500); const filter = {}; if (req.query.from || req.query.to) { filter.createdAt = {}; if (req.query.from) filter.createdAt.$gte = new Date(req.query.from); if (req.query.to) filter.createdAt.$lte = new Date(req.query.to); } if (req.query.status) filter.overallStatus = req.query.status; const readings = await MonitoringReading.find(filter).sort({ createdAt: -1 }).limit(limit); res.json({ readings, total: await MonitoringReading.countDocuments(filter) }); } catch (e) { next(e); } });
+router.get('/latest', async (req, res, next) => { try { res.json({ reading: await MonitoringReading.findOne().sort({ createdAt: -1 }) }); } catch (e) { next(e); } });
+router.get('/:id', async (req, res, next) => { try { const reading = await MonitoringReading.findById(req.params.id); if (!reading) return res.status(404).json({ message: 'Reading not found.' }); res.json({ reading }); } catch (e) { next(e); } });
+export default router;

@@ -1,0 +1,11 @@
+import 'dotenv/config';
+import express from 'express'; import cors from 'cors'; import mongoose from 'mongoose';
+import authRoutes from './routes/auth.js'; import monitoringRoutes from './routes/monitoring.js'; import alertRoutes from './routes/alerts.js'; import thresholdRoutes from './routes/thresholds.js'; import analyticsRoutes from './routes/analytics.js';
+import { ensureThresholds } from './services/thresholdService.js';
+const allowedOrigins = [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174'].filter(Boolean);
+const app = express(); app.use(cors({ origin: (origin, callback) => { if (!origin || allowedOrigins.includes(origin)) return callback(null, true); callback(new Error('Origin not allowed by CORS.')); } })); app.use(express.json());
+app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'water-treatment-monitoring-api' }));
+app.use('/api/auth', authRoutes); app.use('/api/monitoring', monitoringRoutes); app.use('/api/alerts', alertRoutes); app.use('/api/thresholds', thresholdRoutes); app.use('/api/analytics', analyticsRoutes);
+app.use((err, req, res, next) => { console.error(err); if (err.name === 'ValidationError') return res.status(400).json({ message: Object.values(err.errors).map(e => e.message).join(', ') }); if (err.name === 'CastError') return res.status(400).json({ message: 'Invalid identifier.' }); res.status(500).json({ message: 'Something went wrong on the server.' }); });
+const port = process.env.PORT || 5000;
+mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/water_treatment_monitoring').then(async () => { await ensureThresholds(); app.listen(port, () => console.log(`API listening on http://localhost:${port}`)); }).catch(err => { console.error('MongoDB connection failed:', err.message); process.exit(1); });
